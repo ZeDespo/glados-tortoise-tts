@@ -1,0 +1,52 @@
+version: "3"
+
+vars:
+  ENV_NAME: $(cat .python-version)
+  PYTHON_VERSION: 3.10
+
+tasks:
+
+  dependencies:
+    desc: "Install all required dependencies for basic usage."
+    cmds:
+      - pip install -r requirements.txt
+      - python setup.py install
+
+  dev-dependencies:
+    desc: "Install all required dependencies for developers."
+    cmds:
+      - poetry install
+      - python setup.py install
+    ignore_error: true
+
+  install:
+    desc: "Install everything one needs for using the Tortoise TTS system."
+    deps:
+      - venv
+      - dependencies
+      - setup-tortoise
+
+  install-dev:
+    desc: "Install everything one needs to develop for this repo."
+    deps:
+      - install
+      - dev-dependencies
+      - setup-tortoise
+    cmds:
+      - pre-commit install
+
+  setup-tortoise:
+    desc: "Install package with `setup.py`"
+    cmds:
+      - python setup.py install
+    preconditions:
+      - sh: '[ ! -d "./TorToiSe.egg-info" ]'
+      - sh: '[ ! -d "./build/" ]'
+      - sh: '[ ! -d "./dist/" ]'
+
+  venv:
+    desc: "Using `pyenv` and the virtualenv plugin, create the environment."
+    cmds:
+      - pyenv install {{.PYTHON_VERSION}}
+      - pyenv virtualenv {{.PYTHON_VERSION}} {{.ENV_NAME}}
+    ignore_error: true

@@ -1,0 +1,46 @@
+[tool.poetry]
+name = "glados-tortoise-tts"
+version = "0.1.0"
+description = "\"Make GlaDOS say anything.\""
+authors = ["\"Alexander Despotakis\""]
+readme = "README.md"
+packages = [{include = "glados_tortoise_tts"}]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+tqdm = "^4.65.0"
+rotary-embedding-torch = "^0.2.3"
+transformers = "4.19"
+tokenizers = "^0.12.1"
+inflect = "^6.0.4"
+progressbar = "^2.5"
+einops = "0.4.1"
+Unidecode = "^1.3.6"
+scipy = "1.10.1"
+librosa = "^0.10.0.post2"
+ffmpeg = "^1.4"
+numpy = "^1.24.3"
+numba = "^0.57.0"
+torchaudio = "^2.0.2"
+threadpoolctl = "^3.1.0"
+llvmlite = "^0.40.0"
+appdirs = "^1.4.4"
+soundfile = "^0.12.1"
+psola = "^0.0.1"
+matplotlib = "^3.7.1"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.3.0"
+ruff = "^0.0.270"
+isort = "^5.12.0"
+autoflake = "^2.1.1"
+pre-commit = "^3.3.2"
+mypy = "^1.3.0"
+pylint = "^2.17.4"
+
+[tool.ruff]
+force-exclude = true
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
