@@ -41,6 +41,10 @@ pylint = "^2.17.4"
 [tool.ruff]
 force-exclude = true
 
+[tool.mypy]
+follow_imports = "skip"
+disable_error_code = "import"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
