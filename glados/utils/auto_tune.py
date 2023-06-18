@@ -47,10 +47,10 @@ class Scale(NamedTuple):
     @property
     def to_str(self) -> str:
         """Conver to Librosa scale format"""
-        return f"{self.pitch.value}:{self.key.value}"
+        return f"{self.pitch.name}:{self.key.name.lower()}"
 
 
-def _autotune(audio: np.ndarray, sample_rate: float, scale: Scale | None = None):
+def _autotune(audio: np.ndarray, sample_rate: float, scale: Scale | None):
     """Autotune to pitch with PYIN algorithm + PSOLA algorithm."""
     # Set some basis parameters.
     frame_length = 2048
