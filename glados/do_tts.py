@@ -1,4 +1,5 @@
 """Make any piece of text sound like GlaDOS."""
+import tempfile
 import typing
 from pathlib import Path
 
@@ -25,14 +26,13 @@ def _get_valid_pitches() -> list[str]:
 def _save(
     gen: torch.Tensor | list[torch.Tensor],
     dbg_state: typing.Any | None,
-    output_path: Path,
 ) -> list[Path]:
     """Save generated tensors."""
     if not isinstance(gen, list):
         gen = [gen]
     output_files: list[Path] = []
     for i, array in enumerate(gen):
-        p = output_path / f"{_DEFAULT_VOICE}_{i}.wav"
+        p = Path(tempfile.gettempdir()) / f"{_DEFAULT_VOICE}_{i}.wav"
         torchaudio.save(  # pylint: disable=no-member
             str(p),
             array.squeeze(0).cpu(),
@@ -109,19 +109,19 @@ def _save(
     "--music-key",
     type=click.Choice(_get_valid_pitches()),
     help="Pitch:Key to scale to.",
-    default="A:min",
+    default=None,
     show_default=True,
 )
 def do_tts(  # pylint: disable=too-many-locals
     text: str,
-    preset: str,
-    output_path: Path,
-    model_dir: str,
-    candidates: int,
-    seed: int | None,
-    produce_debug_state: bool,
-    cvvp_amount: float,
-    music_key: str,
+    preset: str = "fast",
+    output_path: Path = _ROOT_DIR / "results",
+    model_dir: str = MODELS_DIR,
+    candidates: int = 3,
+    seed: int | None = None,
+    produce_debug_state: bool = False,
+    cvvp_amount: float = 0,
+    music_key: str | None = None,
 ):
     """GlaDOS-ify any text."""
     output_path.mkdir(parents=True, exist_ok=True)
@@ -137,9 +137,12 @@ def do_tts(  # pylint: disable=too-many-locals
         return_deterministic_state=True,
         cvvp_amount=cvvp_amount,
     )
-    output_files = _save(gen, dbg_state if produce_debug_state else None, output_path)
+    output_files = _save(
+        gen,
+        dbg_state if produce_debug_state else None,
+    )
     for of in output_files:
-        autotune(of, Scale.from_str(music_key))
+        autotune(of, None if not music_key else Scale.from_str(music_key))
 
 
 if __name__ == "__main__":

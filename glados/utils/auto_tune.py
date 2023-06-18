@@ -50,7 +50,9 @@ class Scale(NamedTuple):
         return f"{self.pitch.name}:{self.key.name.lower()}"
 
 
-def _autotune(audio: np.ndarray, sample_rate: float, scale: Scale | None):
+def _autotune(
+    audio: np.ndarray, sample_rate: float, scale: Scale | None
+) -> sf.SoundFile:
     """Autotune to pitch with PYIN algorithm + PSOLA algorithm."""
     # Set some basis parameters.
     frame_length = 2048
@@ -127,7 +129,7 @@ def _tune_to_scale_helper(wav_snippet: np.ndarray, scale: str):
     return librosa.midi_to_hz(midi_note)
 
 
-def autotune(filepath: Path, scale: Scale | None = None) -> None:
+def autotune(filepath: Path, scale: Scale | None = None) -> sf.SoundFile:
     """
     Autotune some audio recording
 
@@ -138,6 +140,9 @@ def autotune(filepath: Path, scale: Scale | None = None) -> None:
     if y.ndim > 1:
         print("Converting stereo sound to mono.")
         y = y[0, :]
-    pitch_corrected_y = _autotune(y, sr, scale)
-    filepath = filepath.parent / (filepath.stem + "_pitch_corrected" + filepath.suffix)
-    sf.write(str(filepath), pitch_corrected_y, sr)
+    return _autotune(y, sr, scale)
+
+    # filepath = filepath.parent / (
+    #     filepath.stem + '_pitch_corrected' + filepath.suffix
+    # )
+    # sf.write(str(filepath), pitch_corrected_y, sr)
