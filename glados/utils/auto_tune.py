@@ -1,5 +1,6 @@
 """autotune"""
 import enum
+import io
 from pathlib import Path
 from typing import NamedTuple
 
@@ -129,18 +130,23 @@ def _tune_to_scale_helper(wav_snippet: np.ndarray, scale: str):
     return librosa.midi_to_hz(midi_note)
 
 
-def autotune(filepath: Path, scale: Scale | None = None) -> sf.SoundFile:
+def autotune(
+    filepath: Path | io.BytesIO, scale: Scale | None = None
+) -> tuple[sf.SoundFile, float]:
     """
     Autotune some audio recording
 
     :param filepath: Path to some file containing sound to autotune.
     :param scale: If provided, autotune to this exact pitch.
     """
-    y, sr = librosa.load(str(filepath), sr=None, mono=False)
+    source: str | io.BytesIO = (
+        filepath if isinstance(filepath, io.BytesIO) else str(filepath)
+    )
+    y, sr = librosa.load(source, sr=None, mono=False)
     if y.ndim > 1:
         print("Converting stereo sound to mono.")
         y = y[0, :]
-    return _autotune(y, sr, scale)
+    return _autotune(y, sr, scale), sr
 
     # filepath = filepath.parent / (
     #     filepath.stem + '_pitch_corrected' + filepath.suffix

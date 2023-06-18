@@ -1,9 +1,10 @@
 """Make any piece of text sound like GlaDOS."""
-import tempfile
+import io
 import typing
 from pathlib import Path
 
 import click
+import soundfile
 import torch
 import torchaudio
 
@@ -23,27 +24,30 @@ def _get_valid_pitches() -> list[str]:
     return valid
 
 
-def _save(
+def _tensors_to_soundfiles(
     gen: torch.Tensor | list[torch.Tensor],
     dbg_state: typing.Any | None,
-) -> list[Path]:
+) -> list[io.BytesIO]:
     """Save generated tensors."""
     if not isinstance(gen, list):
         gen = [gen]
-    output_files: list[Path] = []
+    output_buffers: list[io.BytesIO] = []
     for i, array in enumerate(gen):
-        p = Path(tempfile.gettempdir()) / f"{_DEFAULT_VOICE}_{i}.wav"
+        buffer = io.BytesIO()
+        buffer.name = f"{_DEFAULT_VOICE}_{i}.wav"
         torchaudio.save(  # pylint: disable=no-member
-            str(p),
+            buffer,
             array.squeeze(0).cpu(),
             24_000,
+            format="wav",
         )
-        output_files.append(p)
+        buffer.seek(0, io.SEEK_SET)
+        output_buffers.append(buffer)
     if dbg_state:
         ds_path = _ROOT_DIR / "debug_states"
         ds_path.mkdir(exist_ok=True, parents=True)
         torch.save(dbg_state, str(ds_path / f"do_tts_debug_{_DEFAULT_VOICE}.pth"))
-    return output_files
+    return output_buffers
 
 
 @click.command()
@@ -137,12 +141,15 @@ def do_tts(  # pylint: disable=too-many-locals
         return_deterministic_state=True,
         cvvp_amount=cvvp_amount,
     )
-    output_files = _save(
+    output_files = _tensors_to_soundfiles(
         gen,
         dbg_state if produce_debug_state else None,
     )
     for of in output_files:
-        autotune(of, None if not music_key else Scale.from_str(music_key))
+        autotuned, sr = autotune(
+            of, None if not music_key else Scale.from_str(music_key)
+        )
+        soundfile.write(output_path / of.name, autotuned, sr)
 
 
 if __name__ == "__main__":
