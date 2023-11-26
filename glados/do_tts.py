@@ -7,6 +7,7 @@ import click
 import soundfile
 import torch
 import torchaudio
+from psola.core import functools
 
 from glados.utils.auto_tune import Pitch, Scale, autotune
 from tortoise.api import MODELS_DIR, TextToSpeech
@@ -24,7 +25,30 @@ def _get_valid_pitches() -> list[str]:
     return valid
 
 
-def _tensors_to_soundfiles(
+@functools.cache
+def _load_tts(
+    model_dir: str,
+) -> tuple[TextToSpeech, list[torch.Tensor], list[torch.Tensor]]:
+    tts = TextToSpeech(models_dir=model_dir)
+    voice_samples, conditioning_latents = load_voices((_DEFAULT_VOICE,))
+    return tts, voice_samples, conditioning_latents  # type: ignore
+
+
+def _save(
+    autotuned: soundfile.SoundFile,
+    sr: float,
+    output_path: Path,
+    filename: str,
+    file_prefix: str,
+) -> Path:
+    """Save the soundfile to the file."""
+    filename = filename.replace(_DEFAULT_VOICE, file_prefix)
+    output_path = output_path / filename
+    soundfile.write(output_path, autotuned, sr)
+    return output_path
+
+
+def _tensors_to_bytesio(
     gen: torch.Tensor | list[torch.Tensor],
     dbg_state: typing.Any | None,
 ) -> list[io.BytesIO]:
@@ -50,6 +74,45 @@ def _tensors_to_soundfiles(
     return output_buffers
 
 
+def do_tts(  # pylint: disable=too-many-locals
+    text: str,
+    preset: str = "fast",
+    output_path: Path = _ROOT_DIR / "results",
+    output_base_name: str = _DEFAULT_VOICE,
+    model_dir: str = MODELS_DIR,
+    candidates: int = 3,
+    seed: int | None = None,
+    produce_debug_state: bool = False,
+    cvvp_amount: float = 0,
+    music_key: str | None = None,
+) -> list[Path]:
+    """Do the actual glados stuff"""
+    output_path.mkdir(parents=True, exist_ok=True)
+    tts, voice_samples, conditioning_latents = _load_tts(model_dir)
+    gen, dbg_state = tts.tts_with_preset(
+        text=text,
+        k=candidates,
+        voice_samples=voice_samples,
+        conditioning_latents=conditioning_latents,
+        preset=preset,
+        use_deterministic_seed=seed,
+        return_deterministic_state=True,
+        cvvp_amount=cvvp_amount,
+    )
+    output_buffers = _tensors_to_bytesio(
+        gen,
+        dbg_state if produce_debug_state else None,
+    )
+    output_paths: list[Path] = []
+    for buffers in output_buffers:
+        autotuned, sr = autotune(
+            buffers, None if not music_key else Scale.from_str(music_key)
+        )
+        op = _save(autotuned, sr, output_path, buffers.name, output_base_name)
+        output_paths.append(op)
+    return output_paths
+
+
 @click.command()
 @click.option("-t", "--text", help="Text to speak.", type=str, required=True)
 @click.option(
@@ -62,11 +125,17 @@ def _tensors_to_soundfiles(
 )
 @click.option(
     "-op",
-    "--output_path",
+    "--output-path",
     help="Where to store outputs.",
     default=_ROOT_DIR / "results",
     type=Path,
     show_default=True,
+)
+@click.option(
+    "-obn",
+    "--output-base-name",
+    help="The base prefix to save the file as.",
+    default=_DEFAULT_VOICE,
 )
 @click.option(
     "-md",
@@ -116,41 +185,10 @@ def _tensors_to_soundfiles(
     default=None,
     show_default=True,
 )
-def do_tts(  # pylint: disable=too-many-locals
-    text: str,
-    preset: str = "fast",
-    output_path: Path = _ROOT_DIR / "results",
-    model_dir: str = MODELS_DIR,
-    candidates: int = 3,
-    seed: int | None = None,
-    produce_debug_state: bool = False,
-    cvvp_amount: float = 0,
-    music_key: str | None = None,
-):
-    """GlaDOS-ify any text."""
-    output_path.mkdir(parents=True, exist_ok=True)
-    tts = TextToSpeech(models_dir=model_dir)
-    voice_samples, conditioning_latents = load_voices((_DEFAULT_VOICE,))
-    gen, dbg_state = tts.tts_with_preset(
-        text=text,
-        k=candidates,
-        voice_samples=voice_samples,
-        conditioning_latents=conditioning_latents,
-        preset=preset,
-        use_deterministic_seed=seed,
-        return_deterministic_state=True,
-        cvvp_amount=cvvp_amount,
-    )
-    output_files = _tensors_to_soundfiles(
-        gen,
-        dbg_state if produce_debug_state else None,
-    )
-    for of in output_files:
-        autotuned, sr = autotune(
-            of, None if not music_key else Scale.from_str(music_key)
-        )
-        soundfile.write(output_path / of.name, autotuned, sr)
+def gladosify(*args, **kwargs) -> None:
+    """Say any text with Glados' AI voice model."""
+    do_tts(*args, **kwargs)
 
 
 if __name__ == "__main__":
-    do_tts()  # pylint: disable=no-value-for-parameter
+    gladosify()  # pylint: disable=no-value-for-parameter
